@@ -1,7 +1,7 @@
 import time
 
 from micropython import const
-from pn532.target import PassiveTarget
+from pn532.tags import NFCTag
 
 __version__ = "0.0.0"
 
@@ -197,9 +197,22 @@ class PN532:
             response_length=64,
             timeout=timeout,
         )
-        if response is None:
+        if response is None or response[0] != 0x01 or len(response) < 6:
             return None
-        return PassiveTarget.from_bytes(response)
+        uid_len = response[5]
+        return NFCTag(
+            self,
+            response[1],
+            response[2:4],
+            response[4],
+            response[6:6 + uid_len],
+            response[6 + uid_len:],
+        )
+
+    def read_tag(self, card_baud=MIFARE_ISO14443A, timeout=1):
+        if not self.listen_for_passive_target(card_baud=card_baud, timeout=timeout):
+            return None
+        return self.get_passive_target(timeout=timeout)
 
     def in_data_exchange(self, data, response_length=0, timeout=1, target_number=1):
         params = bytearray(1 + len(data))
