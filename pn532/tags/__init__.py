@@ -1,8 +1,8 @@
 class NFCTag:
     def __new__(cls, pn532, number, atqa, sak, uid, ats=None):
         if cls is NFCTag:
-            from pn532.tags.mifare_classic import MifareClassic
             if sak in (0x08, 0x18):
+                from pn532.tags.mifare_classic import MifareClassic
                 return MifareClassic(pn532, number, atqa, sak, uid, ats)
             # elif sak == 0x20:
             #     from pn532.tags.desfire import DESFire
