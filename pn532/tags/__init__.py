@@ -16,3 +16,13 @@ class NFCTag:
         self.sak = sak
         self.uid = bytes(uid)
         self.ats = bytes(ats or b"")
+
+    def __repr__(self):
+        from ubinascii import hexlify
+        return "<{} uid={} atqa={} sak=0x{:02x}{}>".format(
+            self.__class__.__name__,
+            hexlify(self.uid).decode(),
+            hexlify(self.atqa).decode(),
+            self.sak,
+            " ats={}".format(hexlify(self.ats).decode()) if self.ats else "",
+        )
