@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "micropython-pn532"
+dynamic = ["version"]
+description = "PN532 library for MicroPython"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+  { name = "Petr Kracik", email = "petrkr@petrkr.net" },
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: Implementation :: MicroPython",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Development Status :: 3 - Alpha",
+]
+
+[project.urls]
+Homepage = "https://github.com/petrkr/micropython-pn532"
+
+[tool.setuptools.dynamic]
+version = { attr = "pn532.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["pn532*"]
