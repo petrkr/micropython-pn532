@@ -14,7 +14,7 @@ class NFCTag:
         cls._registry.append(tag_cls)
 
     @classmethod
-    def resolve_type(cls, pn532, number, atqa, sak, uid, ats=None):
+    def _resolve_type(cls, pn532, number, atqa, sak, uid, ats=None):
         for tag_cls in cls._registry:
             if tag_cls.matches(atqa=atqa, sak=sak, uid=uid, ats=ats):
                 return tag_cls(pn532, number, atqa, sak, uid, ats)

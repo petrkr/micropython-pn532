@@ -121,12 +121,12 @@ class PN532:
 
         return response[offset + 2 : offset + 2 + frame_len]
 
-    def call_function(self, command, response_length=0, params=[], timeout=1):
-        if not self.send_command(command, params=params, timeout=timeout):
+    def _call_function(self, command, response_length=0, params=[], timeout=1):
+        if not self._send_command(command, params=params, timeout=timeout):
             return None
-        return self.process_response(command, response_length=response_length, timeout=timeout)
+        return self._process_response(command, response_length=response_length, timeout=timeout)
 
-    def send_command(self, command, params=[], timeout=1):
+    def _send_command(self, command, params=[], timeout=1):
         if self.low_power:
             self._transport.wakeup()
             self.low_power = False
@@ -146,7 +146,7 @@ class PN532:
             raise RuntimeError("Did not receive expected ACK from PN532!")
         return True
 
-    def process_response(self, command, response_length=0, timeout=1):
+    def _process_response(self, command, response_length=0, timeout=1):
         if not self._transport.wait_ready(timeout):
             return None
         response = self._read_frame(response_length + 2)
@@ -159,30 +159,24 @@ class PN532:
             self._reset_pin.value(0)
             self.low_power = True
         else:
-            response = self.call_function(COMMAND_POWERDOWN, params=[0xB0, 0x00])
+            response = self._call_function(COMMAND_POWERDOWN, params=[0xB0, 0x00])
             self.low_power = response[0] == 0x00
         time.sleep(0.005)
         return self.low_power
 
     @property
     def firmware_version(self):
-        response = self.call_function(COMMAND_GETFIRMWAREVERSION, 4, timeout=0.5)
+        response = self._call_function(COMMAND_GETFIRMWAREVERSION, 4, timeout=0.5)
         if response is None:
             raise RuntimeError("Failed to detect the PN532")
         return tuple(response)
 
-    def SAM_configuration(self):
-        self.call_function(COMMAND_SAMCONFIGURATION, params=[0x01, 0x14, 0x01])
+    def configure_sam(self):
+        self._call_function(COMMAND_SAMCONFIGURATION, params=[0x01, 0x14, 0x01])
 
-    def read_passive_target(self, card_baud=MIFARE_ISO14443A, timeout=1):
-        response = self.listen_for_passive_target(card_baud=card_baud, timeout=timeout)
-        if not response:
-            return None
-        return self.get_passive_target(timeout=timeout)
-
-    def listen_for_passive_target(self, card_baud=MIFARE_ISO14443A, timeout=1):
+    def _listen_for_passive_target(self, card_baud=MIFARE_ISO14443A, timeout=1):
         try:
-            response = self.send_command(
+            response = self._send_command(
                 COMMAND_INLISTPASSIVETARGET,
                 params=[0x01, card_baud],
                 timeout=timeout,
@@ -191,8 +185,8 @@ class PN532:
             return False
         return response
 
-    def get_passive_target(self, timeout=1):
-        response = self.process_response(
+    def _get_passive_target(self, timeout=1):
+        response = self._process_response(
             COMMAND_INLISTPASSIVETARGET,
             response_length=64,
             timeout=timeout,
@@ -200,7 +194,7 @@ class PN532:
         if response is None or response[0] != 0x01 or len(response) < 6:
             return None
         uid_len = response[5]
-        return NFCTag.resolve_type(
+        return NFCTag._resolve_type(
             self,
             response[1],
             response[2:4],
@@ -210,15 +204,15 @@ class PN532:
         )
 
     def read_tag(self, card_baud=MIFARE_ISO14443A, timeout=1):
-        if not self.listen_for_passive_target(card_baud=card_baud, timeout=timeout):
+        if not self._listen_for_passive_target(card_baud=card_baud, timeout=timeout):
             return None
-        return self.get_passive_target(timeout=timeout)
+        return self._get_passive_target(timeout=timeout)
 
     def in_data_exchange(self, data, response_length=0, timeout=1, target_number=1):
         params = bytearray(1 + len(data))
         params[0] = target_number & 0xFF
         params[1:] = data
-        response = self.call_function(
+        response = self._call_function(
             COMMAND_INDATAEXCHANGE,
             params=params,
             response_length=response_length + 1,
