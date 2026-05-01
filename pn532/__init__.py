@@ -72,7 +72,7 @@ class PN532:
                 print("Resetting")
             self._reset_pin.value(0)
             time.sleep(0.1)
-            self._reset_pin.value(0)
+            self._reset_pin.value(1)
             time.sleep(0.1)
         self._transport.wakeup()
         self.low_power = False
