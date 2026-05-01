@@ -9,6 +9,9 @@ _WRITE = const(0xA0)
 
 
 class MifareClassic(NFCTag):
+    @classmethod
+    def matches(cls, *, atqa, sak, uid, ats=None):
+        return sak in (0x08, 0x18)
 
     def authenticate_block(self, block_number, key_number, key):
         params = bytearray(2 + len(key) + len(self.uid))
@@ -100,3 +103,6 @@ class MifareClassicIO(IOBase):
                 self._buffer += data
                 ndatablocksread += 1
             self._blockpos += 1
+
+
+NFCTag.register_type(MifareClassic)

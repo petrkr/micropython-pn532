@@ -200,7 +200,7 @@ class PN532:
         if response is None or response[0] != 0x01 or len(response) < 6:
             return None
         uid_len = response[5]
-        return NFCTag(
+        return NFCTag.resolve_type(
             self,
             response[1],
             response[2:4],
