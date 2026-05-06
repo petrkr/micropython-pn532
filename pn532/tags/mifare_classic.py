@@ -79,11 +79,12 @@ class MifareClassic(NFCTag):
         )
 
     def authenticate_block(self, block_number, key_number, key):
-        params = bytearray(2 + len(key) + len(self.uid))
+        uid4 = self.uid[-4:]
+        params = bytearray(2 + len(key) + 4)
         params[0] = key_number & 0xFF
         params[1] = block_number & 0xFF
         params[2:2 + len(key)] = key
-        params[2 + len(key):] = self.uid
+        params[2 + len(key):] = uid4
         try:
             self._pn532.in_data_exchange(params, response_length=0, target_number=self.number)
         except RuntimeError:

@@ -46,4 +46,4 @@ while True:
 Limitations:
 - tested only over SPI
 - `MifareClassicIO` is a raw linear stream over user data blocks
-- 7-byte UID Mifare Classic auth is not resolved yet
+- 7-byte UID Mifare Classic cards are supported (auth uses last 4 bytes of UID)
