@@ -6,6 +6,8 @@ AUTH_A = const(0x60)
 AUTH_B = const(0x61)
 _READ  = const(0x30)
 _WRITE = const(0xA0)
+BLOCK_SKIP = const(0)
+BLOCK_INCLUDE = const(1)
 TYPE_1K = const(1)
 TYPE_4K = const(4)
 _BLOCK_SIZE = const(16)
@@ -106,36 +108,83 @@ class MifareClassic(NFCTag):
 
 
 class MifareClassicIO(IOBase):
-    def __init__(self, tag, key=b'\xff\xff\xff\xff\xff\xff', key_number=AUTH_B):
+    def __init__(
+        self,
+        tag,
+        key=b'\xff\xff\xff\xff\xff\xff',
+        key_number=AUTH_B,
+        *,
+        blocks=(),
+        block_mode=BLOCK_INCLUDE,
+    ):
         self._tag = tag
         self._key = key
         self._key_number = key_number
-        self._buffer = bytes()
         self._bufpos = 0
-        self._blockpos = 0
-        self._blocksize = _BLOCK_SIZE
-        self._size = tag.size
-
-        sector0 = self.read(self._blocksize * 3)
-        if sector0[0:4] != tag.uid[0:4]:
-            raise Exception("UID does not match Sector 0!")
+        self._block_filter = tuple(blocks)
+        self._block_mode = block_mode
+        if not self._block_filter:
+            self._size = tag.data_block_count * _BLOCK_SIZE
+        elif self._block_mode == BLOCK_INCLUDE:
+            self._size = len(self._block_filter) * _BLOCK_SIZE
+        else:
+            self._size = (tag.data_block_count - len(self._block_filter)) * _BLOCK_SIZE
+        self._sector = None
+        self._cache = (None, None)
 
     def read(self, count):
         if count < 0:
             raise ValueError("Can not read negative number of bytes")
         if self._bufpos + count > self._size:
             raise ValueError("Can not read more data")
-        if self._bufpos + count > len(self._buffer):
-            self._read_mifare_block(self._bufpos + count - len(self._buffer))
-        pos = self._bufpos
+        if count == 0:
+            return b""
+
+        start_logical = self._bufpos // _BLOCK_SIZE
+        start_offset  = self._bufpos % _BLOCK_SIZE
+        end_logical   = (self._bufpos + count - 1) // _BLOCK_SIZE
+
+        data = bytearray()
+        logical_idx = 0
+        block_index = start_logical
+        for phys in range(1, self._tag.block_count):
+            if self._is_sector_trailer(phys) or not self._block_selected(phys):
+                continue
+            if logical_idx < start_logical:
+                logical_idx += 1
+                continue
+            block_number = phys
+            sector = self._block_sector(block_number)
+            if sector != self._sector:
+                if not self._tag.authenticate_block(block_number, self._key_number, self._key):
+                    raise ValueError("Authentication failed block {} sector {}".format(
+                        block_number, sector))
+                self._sector = sector
+            if block_number == self._cache[0]:
+                block = self._cache[1]
+            else:
+                block = self._tag.read_block(block_number)
+                if block is None:
+                    raise ValueError("Can not read block {}".format(block_number))
+                self._cache = (block_number, block)
+            if block_index == start_logical:
+                block = block[start_offset:]
+            if block_index == end_logical:
+                block = block[:count - len(data)]
+            data.extend(block)
+            if block_index == end_logical:
+                break
+            block_index += 1
+            logical_idx += 1
+
         self._bufpos += count
-        return self._buffer[pos:self._bufpos]
+        return bytes(data)
 
     def seek(self, position):
         if position < 0:
             raise ValueError("Can not seek negative number")
-        if position > len(self._buffer):
-            raise ValueError("Can not seek beyond buffer")
+        if position > self._size:
+            raise ValueError("Can not seek beyond data")
         self._bufpos = position
 
     def seekable(self):
@@ -153,22 +202,14 @@ class MifareClassicIO(IOBase):
     def close(self):
         pass
 
-    def _read_mifare_block(self, count):
-        ndatablocks = count // self._blocksize
-        if count % self._blocksize != 0:
-            ndatablocks += 1
-
-        ndatablocksread = 0
-        while ndatablocksread < ndatablocks:
-            if self._is_sector_first_block(self._blockpos):
-                if not self._tag.authenticate_block(self._blockpos, self._key_number, self._key):
-                    raise ValueError("Authentication failed block {} sector {}".format(
-                        self._blockpos, self._block_sector(self._blockpos)))
-            if not self._is_sector_trailer(self._blockpos):
-                data = self._tag.read_block(self._blockpos)
-                self._buffer += data
-                ndatablocksread += 1
-            self._blockpos += 1
+    def _block_selected(self, block_number):
+        if not self._block_filter:
+            return True
+        if self._block_mode == BLOCK_INCLUDE:
+            return block_number in self._block_filter
+        if self._block_mode == BLOCK_SKIP:
+            return block_number not in self._block_filter
+        raise ValueError("Unsupported block mode")
 
     def _block_sector(self, block_number):
         if self._tag.sak == _CLASSIC_4K_SAK and block_number >= _CLASSIC_4K_LARGE_BLOCK_START:
@@ -177,24 +218,10 @@ class MifareClassicIO(IOBase):
             )
         return block_number // _CLASSIC_SMALL_SECTOR_BLOCKS
 
-    def _sector_first_block(self, sector):
-        if self._tag.sak == _CLASSIC_4K_SAK and sector >= _CLASSIC_4K_LARGE_SECTOR_START:
-            return _CLASSIC_4K_LARGE_BLOCK_START + (
-                (sector - _CLASSIC_4K_LARGE_SECTOR_START) * _CLASSIC_LARGE_SECTOR_BLOCKS
-            )
-        return sector * _CLASSIC_SMALL_SECTOR_BLOCKS
-
-    def _sector_size(self, sector):
-        if self._tag.sak == _CLASSIC_4K_SAK and sector >= _CLASSIC_4K_LARGE_SECTOR_START:
-            return _CLASSIC_LARGE_SECTOR_BLOCKS
-        return _CLASSIC_SMALL_SECTOR_BLOCKS
-
-    def _is_sector_first_block(self, block_number):
-        return block_number == self._sector_first_block(self._block_sector(block_number))
-
     def _is_sector_trailer(self, block_number):
-        sector = self._block_sector(block_number)
-        return block_number == self._sector_first_block(sector) + self._sector_size(sector) - 1
+        if self._tag.sak == _CLASSIC_4K_SAK and block_number >= _CLASSIC_4K_LARGE_BLOCK_START:
+            return (block_number - _CLASSIC_4K_LARGE_BLOCK_START + 1) % _CLASSIC_LARGE_SECTOR_BLOCKS == 0
+        return (block_number + 1) % _CLASSIC_SMALL_SECTOR_BLOCKS == 0
 
 
 NFCTag.register_type(MifareClassic)
