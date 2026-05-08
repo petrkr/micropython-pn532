@@ -7,6 +7,7 @@ _DESFIRE_SAK = const(0x20)
 _WRAP_CLA = const(0x90)
 _GET_APPLICATION_IDS = const(0x6A)
 _SELECT_APPLICATION = const(0x5A)
+_GET_FILE_IDS = const(0x6F)
 _ADDITIONAL_FRAME = const(0xAF)
 _STATUS_OK = const(0x00)
 
@@ -30,6 +31,10 @@ class DesfireTag(IsoDepTag):
             raise ValueError("AID must be 3 bytes")
         self._desfire_command(_SELECT_APPLICATION, aid)
         return True
+
+    def get_file_ids(self):
+        data = self._desfire_command(_GET_FILE_IDS)
+        return [file_id for file_id in data]
 
     def _desfire_command(self, ins, data=b""):
         response = self._transceive_apdu(ins, data)
