@@ -29,8 +29,10 @@ class NTAG(NFCTag):
         self.version = self.read_page(_CC_PAGE)
 
     @classmethod
-    def matches(cls, *, atqa, sak, uid, ats=None):
-        return bytes(atqa) == _NTAG_ATQA and sak == _NTAG_SAK
+    def resolve_type(cls, *, atqa, sak, uid, ats=None):
+        if bytes(atqa) == _NTAG_ATQA and sak == _NTAG_SAK:
+            return cls
+        return None
 
     @property
     def page_size(self):

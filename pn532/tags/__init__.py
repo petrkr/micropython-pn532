@@ -16,13 +16,14 @@ class NFCTag:
     @classmethod
     def _resolve_type(cls, pn532, number, atqa, sak, uid, ats=None):
         for tag_cls in cls._registry:
-            if tag_cls.matches(atqa=atqa, sak=sak, uid=uid, ats=ats):
-                return tag_cls(pn532, number, atqa, sak, uid, ats)
+            resolved_cls = tag_cls.resolve_type(atqa=atqa, sak=sak, uid=uid, ats=ats)
+            if resolved_cls is not None:
+                return resolved_cls(pn532, number, atqa, sak, uid, ats)
         return cls(pn532, number, atqa, sak, uid, ats)
 
     @classmethod
-    def matches(cls, *, atqa, sak, uid, ats=None):
-        return False
+    def resolve_type(cls, *, atqa, sak, uid, ats=None):
+        return None
 
     def __repr__(self):
         from ubinascii import hexlify

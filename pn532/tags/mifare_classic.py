@@ -27,8 +27,10 @@ _CLASSIC_LARGE_SECTOR_BLOCKS = const(16)
 
 class MifareClassic(NFCTag):
     @classmethod
-    def matches(cls, *, atqa, sak, uid, ats=None):
-        return sak in (_CLASSIC_1K_SAK, _CLASSIC_4K_SAK)
+    def resolve_type(cls, *, atqa, sak, uid, ats=None):
+        if sak in (_CLASSIC_1K_SAK, _CLASSIC_4K_SAK):
+            return cls
+        return None
 
     @property
     def type(self):
