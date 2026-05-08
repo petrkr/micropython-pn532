@@ -1,4 +1,5 @@
 from micropython import const
+from ubinascii import hexlify
 
 from pn532.tags.isodep import IsoDepTag
 
@@ -26,6 +27,16 @@ class DesfireFile:
         self.settings = settings
         self._offset = 0
 
+    def __repr__(self):
+        return "<{} id={} type={} size={} comm_mode={} access_rights={}>".format(
+            self.__class__.__name__,
+            self.file_id,
+            self.file_type,
+            self.size,
+            self.comm_mode,
+            hexlify(self.access_rights).decode(),
+        )
+
     def read(self, count=-1):
         self._application._select()
         if count is None or count < 0:
@@ -50,6 +61,12 @@ class DesfireApplication:
         self._tag = tag
         self.aid = bytes(aid)
 
+    def __repr__(self):
+        return "<{} aid={}>".format(
+            self.__class__.__name__,
+            hexlify(self.aid).decode(),
+        )
+
     @property
     def files(self):
         self._select()
@@ -66,6 +83,17 @@ class DesfireTag(IsoDepTag):
         if bytes(atqa) == _DESFIRE_ATQA and sak == _DESFIRE_SAK and bool(ats):
             return cls
         return None
+
+    def __repr__(self):
+        type_name = "EV2" if self.atqa == _DESFIRE_ATQA else "unknown"
+        return "<{} type={} uid={} atqa={} sak=0x{:02x}{}>".format(
+            self.__class__.__name__,
+            type_name,
+            hexlify(self.uid).decode(),
+            hexlify(self.atqa).decode(),
+            self.sak,
+            " ats={}".format(hexlify(self.ats).decode()) if self.ats else "",
+        )
 
     @property
     def applications(self):
@@ -146,11 +174,9 @@ class DesfireTag(IsoDepTag):
         else:
             apdu = bytes([_WRAP_CLA, ins & 0xFF, 0x00, 0x00, 0x00])
 
-        self.last_apdu_tx = bytes(apdu)
         response = self.transceive(apdu)
         if response is None:
             raise ValueError("Empty DESFire response")
-        self.last_apdu_rx = bytes(response)
         return response
 
 IsoDepTag.register_type(DesfireTag)
