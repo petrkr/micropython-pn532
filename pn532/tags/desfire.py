@@ -1,3 +1,4 @@
+from io import IOBase
 from micropython import const
 from ubinascii import hexlify
 
@@ -16,7 +17,7 @@ _STATUS_OK = const(0x00)
 _MAX_READ_SIZE = const(48)
 
 
-class DesfireFile:
+class DesfireFile(IOBase):
     def __init__(self, application, file_id, settings):
         self._application = application
         self.file_id = file_id
@@ -54,6 +55,12 @@ class DesfireFile:
 
     def tell(self):
         return self._offset
+
+    def seekable(self):
+        return True
+
+    def close(self):
+        pass
 
 
 class DesfireApplication:
