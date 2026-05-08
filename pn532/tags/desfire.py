@@ -6,6 +6,7 @@ _DESFIRE_ATQA = b"\x03\x44"
 _DESFIRE_SAK = const(0x20)
 _WRAP_CLA = const(0x90)
 _GET_APPLICATION_IDS = const(0x6A)
+_SELECT_APPLICATION = const(0x5A)
 _ADDITIONAL_FRAME = const(0xAF)
 _STATUS_OK = const(0x00)
 
@@ -23,6 +24,12 @@ class DesfireTag(IsoDepTag):
         for idx in range(0, len(data), 3):
             applications.append(bytes(data[idx:idx + 3]))
         return applications
+
+    def select_application(self, aid):
+        if len(aid) != 3:
+            raise ValueError("AID must be 3 bytes")
+        self._desfire_command(_SELECT_APPLICATION, aid)
+        return True
 
     def _desfire_command(self, ins, data=b""):
         response = self._transceive_apdu(ins, data)
