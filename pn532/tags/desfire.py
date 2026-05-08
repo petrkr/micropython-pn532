@@ -8,6 +8,7 @@ _WRAP_CLA = const(0x90)
 _GET_APPLICATION_IDS = const(0x6A)
 _SELECT_APPLICATION = const(0x5A)
 _GET_FILE_IDS = const(0x6F)
+_GET_FILE_SETTINGS = const(0xF5)
 _ADDITIONAL_FRAME = const(0xAF)
 _STATUS_OK = const(0x00)
 
@@ -35,6 +36,18 @@ class DesfireTag(IsoDepTag):
     def get_file_ids(self):
         data = self._desfire_command(_GET_FILE_IDS)
         return [file_id for file_id in data]
+
+    def get_file_settings(self, file_id):
+        data = self._desfire_command(_GET_FILE_SETTINGS, bytes([file_id & 0xFF]))
+        settings = {
+            "file_type": data[0] if len(data) > 0 else None,
+            "comm_mode": data[1] if len(data) > 1 else None,
+            "access_rights": bytes(data[2:4]) if len(data) >= 4 else b"",
+            "raw": bytes(data),
+        }
+        if len(data) >= 7:
+            settings["file_size"] = data[4] | (data[5] << 8) | (data[6] << 16)
+        return settings
 
     def _desfire_command(self, ins, data=b""):
         response = self._transceive_apdu(ins, data)
