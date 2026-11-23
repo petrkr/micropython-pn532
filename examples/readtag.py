@@ -1,15 +1,23 @@
-from machine import Pin, SPI
+from machine import Pin, SPI, UART
 
 from pn532 import PN532
 from pn532.transports.spi import SPITransport
+from pn532.transports.hsu import HSUTransport
 
+NFC_TX = 17
+NFC_RX = 16
 
-spi = SPI(1, baudrate=1_000_000, polarity=0, phase=0)
-ss = Pin(10, Pin.OUT, value=1)
+# SPI
+#spi = SPI(1, baudrate=1_000_000, polarity=0, phase=0)
+#ss = Pin(10, Pin.OUT, value=1)
+#transport = SPITransport(spi, ss)
 
-transport = SPITransport(spi, ss)
+# UART
+hsu = UART(2, 115200, tx=NFC_TX, rx=NFC_RX)
+transport = HSUTransport(hsu)
+
 pn532 = PN532(transport)
-pn532.configure_sam()
+print(pn532.firmware_version)
 
 
 while True:
