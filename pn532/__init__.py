@@ -48,6 +48,11 @@ COMMAND_TGGETINITIATORCOMMAND = const(0x88)
 
 MIFARE_ISO14443A = const(0x00)
 
+SAM_MODE_NORMAL = const(0x01)
+SAM_MODE_VIRTUAL = const(0x02)
+SAM_MODE_WIRED = const(0x03)
+SAM_MODE_DUAL = const(0x04)
+
 ACK = b"\x00\x00\xFF\x00\xFF\x00"
 WAKEUP = const(0x55)
 
@@ -64,6 +69,7 @@ class PN532:
         self._irq = irq
         self._reset_pin = reset
         self.reset()
+        self.configure_sam()
         _ = self.firmware_version
 
     def reset(self):
@@ -171,8 +177,36 @@ class PN532:
             raise RuntimeError("Failed to detect the PN532")
         return tuple(response)
 
-    def configure_sam(self):
-        self._call_function(COMMAND_SAMCONFIGURATION, params=[0x01, 0x14, 0x01])
+    def configure_sam(self, mode=SAM_MODE_NORMAL, timeout=0x14, irq=True):
+        """Configure the PN532 security access module operating mode.
+
+        :param int mode: SAM operating mode.
+        :param int timeout: Virtual Card timeout in 50 ms units.
+        :param bool irq: Drive the P70_IRQ pin when data is available.
+        :raises ValueError: If an argument is outside its valid range.
+        :raises RuntimeError: If the PN532 does not acknowledge the command.
+        """
+        if mode not in (
+            SAM_MODE_NORMAL,
+            SAM_MODE_VIRTUAL,
+            SAM_MODE_WIRED,
+            SAM_MODE_DUAL,
+        ):
+            raise ValueError("Invalid SAM mode")
+        if not 0 <= timeout <= 0xFF:
+            raise ValueError("SAM timeout must be between 0 and 255")
+        if irq not in (False, True, 0, 1):
+            raise ValueError("SAM IRQ must be a boolean")
+
+        self._transport.wakeup()
+        self.low_power = False
+        response = self._call_function(
+            COMMAND_SAMCONFIGURATION,
+            params=[mode, timeout, int(bool(irq))],
+        )
+        if response is None:
+            raise RuntimeError("Failed to configure PN532")
+        return True
 
     def _listen_for_passive_target(self, card_baud=MIFARE_ISO14443A, timeout=1):
         try:
