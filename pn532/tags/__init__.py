@@ -18,7 +18,15 @@ class NFCTag:
         for tag_cls in cls._registry:
             resolved_cls = tag_cls.resolve_type(atqa=atqa, sak=sak, uid=uid, ats=ats)
             if resolved_cls is not None:
-                return resolved_cls(pn532, number, atqa, sak, uid, ats)
+                tag = resolved_cls(pn532, number, atqa, sak, uid, ats)
+                active_type = getattr(tag, "_resolve_active_type", None)
+                if active_type is not None:
+                    resolved = active_type()
+                    if resolved is not None:
+                        resolved_cls, probe_data = resolved
+                        tag = resolved_cls(pn532, number, atqa, sak, uid, ats)
+                        tag._set_probe_data(probe_data)
+                return tag
         return cls(pn532, number, atqa, sak, uid, ats)
 
     @classmethod

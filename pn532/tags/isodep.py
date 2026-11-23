@@ -12,11 +12,17 @@ class IsoDepTag(NFCTag):
     def resolve_type(cls, *, atqa, sak, uid, ats=None):
         if not (sak == 0x20 and bool(ats)):
             return None
-        for tag_cls in cls._registry:
-            resolved_cls = tag_cls.resolve_type(atqa=atqa, sak=sak, uid=uid, ats=ats)
-            if resolved_cls is not None:
-                return resolved_cls
         return cls
+
+    def _resolve_active_type(self):
+        for tag_cls in self._registry:
+            try:
+                probe_data = tag_cls.probe(self)
+            except (RuntimeError, ValueError):
+                continue
+            if probe_data is not None:
+                return tag_cls, probe_data
+        return None
 
     def transceive(self, data, response_length=255):
         response = self._pn532.in_data_exchange(
