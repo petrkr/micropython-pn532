@@ -4,9 +4,9 @@ from ubinascii import hexlify
 
 from pn532.tags.isodep import IsoDepTag
 
-_DESFIRE_ATQA = b"\x03\x44"
-_DESFIRE_SAK = const(0x20)
 _WRAP_CLA = const(0x90)
+_DESFIRE_PRODUCT_TYPE = const(0x01)
+_GET_VERSION = const(0x60)
 _GET_APPLICATION_IDS = const(0x6A)
 _SELECT_APPLICATION = const(0x5A)
 _GET_FILE_IDS = const(0x6F)
@@ -85,17 +85,32 @@ class DesfireApplication:
 
 
 class DesfireTag(IsoDepTag):
+    def __init__(self, pn532, number, atqa, sak, uid, ats=None):
+        super().__init__(pn532, number, atqa, sak, uid, ats)
+        self.version = b""
+        self.generation = None
+        self.type = "unknown"
+
     @classmethod
-    def resolve_type(cls, *, atqa, sak, uid, ats=None):
-        if bytes(atqa) == _DESFIRE_ATQA and sak == _DESFIRE_SAK and bool(ats):
-            return cls
-        return None
+    def probe(cls, tag):
+        version = cls._native_command(tag, _GET_VERSION)
+        if len(version) < 4 or version[1] != _DESFIRE_PRODUCT_TYPE:
+            return None
+        return version
+
+    def _set_probe_data(self, version):
+        self.version = bytes(version)
+        # The second GetVersion frame contains the software version.  Its
+        # major version distinguishes EV2 and EV3; the first frame is the
+        # common hardware version.
+        self.generation = self.version[10] if len(self.version) >= 11 else None
+        if self.generation in (2, 3):
+            self.type = "EV{}".format(self.generation)
 
     def __repr__(self):
-        type_name = "EV2" if self.atqa == _DESFIRE_ATQA else "unknown"
         return "<{} type={} uid={} atqa={} sak=0x{:02x}{}>".format(
             self.__class__.__name__,
-            type_name,
+            self.type,
             hexlify(self.uid).decode(),
             hexlify(self.atqa).decode(),
             self.sak,
@@ -149,7 +164,11 @@ class DesfireTag(IsoDepTag):
         return bytes(data)
 
     def _desfire_command(self, ins, data=b""):
-        response = self._transceive_apdu(ins, data)
+        return self._native_command(self, ins, data)
+
+    @staticmethod
+    def _native_command(tag, ins, data=b""):
+        response = tag.transceive_apdu(_WRAP_CLA, ins, data=data)
         payload = bytearray()
 
         while True:
@@ -166,24 +185,9 @@ class DesfireTag(IsoDepTag):
             if status != _ADDITIONAL_FRAME:
                 raise ValueError("DESFire command failed with status 0x{:02x}".format(status))
 
-            response = self._transceive_apdu(_ADDITIONAL_FRAME)
+            response = tag.transceive_apdu(_WRAP_CLA, _ADDITIONAL_FRAME)
 
     def _transceive_apdu(self, ins, data=b""):
-        if data:
-            apdu = bytearray(6 + len(data))
-            apdu[0] = _WRAP_CLA
-            apdu[1] = ins & 0xFF
-            apdu[2] = 0x00
-            apdu[3] = 0x00
-            apdu[4] = len(data) & 0xFF
-            apdu[5:5 + len(data)] = data
-            apdu[-1] = 0x00
-        else:
-            apdu = bytes([_WRAP_CLA, ins & 0xFF, 0x00, 0x00, 0x00])
-
-        response = self.transceive(apdu)
-        if response is None:
-            raise ValueError("Empty DESFire response")
-        return response
+        return self.transceive_apdu(_WRAP_CLA, ins, data=data)
 
 IsoDepTag.register_type(DesfireTag)

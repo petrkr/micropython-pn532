@@ -26,5 +26,25 @@ class IsoDepTag(NFCTag):
         )
         return bytes(response) if response is not None else None
 
+    def transceive_apdu(self, cla, ins, p1=0x00, p2=0x00, data=b""):
+        data = bytes(data)
+        if len(data) > 0xFF:
+            raise ValueError("APDU data is too long")
+        if data:
+            apdu = bytearray(6 + len(data))
+            apdu[0] = cla & 0xFF
+            apdu[1] = ins & 0xFF
+            apdu[2] = p1 & 0xFF
+            apdu[3] = p2 & 0xFF
+            apdu[4] = len(data)
+            apdu[5:-1] = data
+            apdu[-1] = 0x00
+        else:
+            apdu = bytes([cla & 0xFF, ins & 0xFF, p1 & 0xFF, p2 & 0xFF, 0x00])
+        response = self.transceive(apdu)
+        if response is None:
+            raise ValueError("Empty ISO-DEP response")
+        return response
+
 
 NFCTag.register_type(IsoDepTag)
