@@ -4,6 +4,7 @@ from ubinascii import hexlify
 from machine import UART, freq
 
 from pn532 import PN532
+from pn532.tags.mifare_classic import MifareClassic
 from pn532.tags.desfire import DesfireTag
 from pn532.tags.isodep import IsoDepTag
 from pn532.transports.hsu import HSUTransport
@@ -59,12 +60,11 @@ while True:
         sleep(0.1)
         continue
 
-    if not isinstance(tag, IsoDepTag):
-        continue
-
     if last_uid == tag.uid:
         continue
 
     last_uid = tag.uid
     print("Found target:", tag)
-    probe_desfire(tag)
+
+    if isinstance(tag, IsoDepTag):
+        probe_desfire(tag)
