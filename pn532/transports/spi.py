@@ -26,6 +26,7 @@ class SPITransport(Transport):
         self._reset_pin = reset
 
     def wakeup(self):
+        # TODO: Check whether an NSS low cycle alone is sufficient for SPI wakeup.
         if self._reset_pin:
             self._reset_pin.value(1)
             time.sleep(0.01)
