@@ -47,7 +47,6 @@ uart.init(baudrate=115200, tx=NFC_TX, rx=NFC_RX, timeout=100)
 
 transport = HSUTransport(uart)
 pn532 = PN532(transport)
-pn532.configure_sam()
 
 last_uid = None
 

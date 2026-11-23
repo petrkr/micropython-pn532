@@ -13,7 +13,6 @@ ss = Pin(10, Pin.OUT, value=1)
 
 transport = SPITransport(spi, ss)
 pn532 = PN532(transport)
-pn532.configure_sam()
 
 last_uid = None
 
